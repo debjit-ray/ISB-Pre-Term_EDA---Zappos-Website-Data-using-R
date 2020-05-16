@@ -1,0 +1,856 @@
+---
+title: "Zappos Website Data Analysis"
+author: "Debjit Ray"
+date: "15/03/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Question 11
+11. For this problem, consider the dataset Prob_Assignment_Dataset.xlsx attached. As the vigilant
+monitors of the Zappos.Com website, we are obsessed with who is coming to our website and what they
+do during their visit. This challenge requires you to look at data similar to that which Analytics teams at Zappos would use to assess the overall performance of the business.
+The data set is a fictional representation of actual data sets that we work with. Perform unii variate descriptive analysis on the variables, and Submit a short description explaining any insights or trends you discovered.
+Include graphs, data tables, and other helpful visuals to communicate your discoveries. You do not have to work on all of the variables (select any 3-.- 4 that are of most interest to you).
+
+### Solution
+```{r Solution - 11}
+
+#Remove all variables declared so far
+rm(list=ls())
+# Read the file into a dataframe and check the structure of the data
+library(openxlsx)
+library(dplyr)
+library(ggplot2)
+
+visitsDF <- read.xlsx("./data/Prob_Assignment_Dataset.xlsx")
+# Load data into a dataframe table
+siteVisitsDF <- tbl_df(visitsDF)
+# Remove the original dataframe used to read the data
+# rm(visitsDF)
+# Explore the dataset
+# head(siteVisitsDF)
+# structure(siteVisitsDF)
+# summary(siteVisitsDF)
+# 
+# # Let us try to check which all columns or variables can be converted to factors
+# table(siteVisitsDF$site)
+# table(siteVisitsDF$new_customer)
+# table(siteVisitsDF$platform)
+
+# Convert the data types of specific columns of dataframe
+siteVisitsDF$day <- convertToDateTime(siteVisitsDF$day)
+siteVisitsDF$site <- as.factor(siteVisitsDF$site)
+siteVisitsDF$new_customer <- as.factor(siteVisitsDF$new_customer)
+siteVisitsDF$platform <- as.factor(siteVisitsDF$platform)
+
+# Review the updated structure of the dataframe table
+head(siteVisitsDF)
+```
+Now for the univariate analysis, I choose the below variables:  
+1. **visits - This will give us an idea of how many distinct visits has been made to Zappos**    
+
+     To start the analysis of this variable, let us get the usual descriptive statistics measures calculated.    
+```{r Solution - 11 Contd. - Univariate Analysis - visits}
+    library(moments)
+    library(dplyr)
+    library(tidyr)
+    library(pander)
+
+    siteVisitsDF %>% 
+      summarize(variable = "visits",
+                Min = min(siteVisitsDF$visits), 
+                Max = max(siteVisitsDF$visits), 
+                Mean = mean(siteVisitsDF$visits),
+                Variance = var(siteVisitsDF$visits),
+                Std_Dev = sd(siteVisitsDF$visits),
+                Median = median(siteVisitsDF$visits),
+                Quartile_1 = quantile(siteVisitsDF$visits,probs = 0.25),
+                Quartile_2 = quantile(siteVisitsDF$visits,probs = 0.50),
+                Quartile_3 = quantile(siteVisitsDF$visits,probs = 0.75),
+                Quantile_90 = quantile(siteVisitsDF$visits,probs = 0.90),
+                Quantile_95 = quantile(siteVisitsDF$visits,probs = 0.95),
+                Skewness = skewness(siteVisitsDF$visits),
+                Kurtosis = kurtosis(siteVisitsDF$visits)) %>% 
+      pander()   
+```
+  + Now the table above shows that the number of visits span across a **huge range from 0 to 136,057**. 
+  + The **mean is around 1935 visits** (1934.7 to be exact) with a **standard deviation of 7448.607**.
+  + The **median lies at 24 visits**
+  + The **first quartile (25%) is at 3 visits, second quartile (50%) is at 24 visits and third quartile (75%) is 360 visits.  
+
+  + **This signifies that the data has too many outliers between the third and fourth quartile.**
+  + On further look at the **90% and 95%** we see, that they **are at 3882 and 9260 respectively**.  
+
+Let us plot a scatter plot to review this data with the index or observtion number on x axis and the number of visits on the y axis.  
+```{r Solution - 11 Contd. - Univariate Analysis - visits- ScatterPlot}
+   library(ggplot2)   
+   ggplot(siteVisitsDF, aes(x= as.numeric(row.names(siteVisitsDF)) ,y= siteVisitsDF$visits)) +
+     geom_point(color = "darkblue", alpha = 0.25) + 
+     geom_smooth(method="loess",colour = "darkgreen", orientation = "y", span = 0.3) +
+     stat_smooth(method="loess",colour="green",linetype=2, orientation = "y") + 
+     geom_hline(aes(yintercept=mean(siteVisitsDF$visits)), 
+                      color="orange", linetype="dashed", size=1) +
+     geom_hline(aes(yintercept=median(siteVisitsDF$visits)), 
+                      color="red", linetype="dashed", size=1) +   
+     xlab("Observation Number") + 
+     ylab("Number of distinct site visits ")
+```
+   
+ + The scatter plot shows there is a clear outlier on the top right, which obviously corresponds to the maximum number earlier found i.e. 136,057.  
+ + This also shows the dense population of data at the extreme bottom section of the data
+ + Another thing to notice is the data, in general sees an upward trend after the 17,500 observations. 
+ + Also, most of the outliers lie between observation numbers 17,500 and 21,061. Now checking the date for these observations will reveal that this is the Holiday period (18-Nov'13 to 31-Dec'13) and hence, the number of visits have increased.  
+
+```{r Solution - 11 Contd. - Univariate Analysis - visits - Outliers}
+library(pander)   
+
+pander(siteVisitsDF[c(17500,21061,10000),c(1)])
+
+```
+ + A generic read of the scatter plot reveals that the visits gradually decrease from Jan to Aug (observation number 10,000) and then pick up from mid November. The holiday period is thus, skewing the data.  
+
+
+Now, plotting the scatterplot again with eliminating the outliers of greater than the 95% data.  
+ 
+```{r Solution - 11 Contd. - Univariate Analysis - visits- ScatterPlot2}
+   library(ggplot2)   
+   ggplot(siteVisitsDF, aes(x= as.numeric(row.names(siteVisitsDF)) ,y= siteVisitsDF$visits)) +
+     geom_point(color = "darkblue", alpha = 0.25) + xlab("Observation Number") +
+     geom_smooth(method="loess",colour = "darkgreen", orientation = "y", span = 0.3) +
+     stat_smooth(method="loess",colour="green",linetype=2, orientation = "y") + 
+     geom_hline(aes(yintercept=mean(siteVisitsDF$visits)), 
+                      color="orange", linetype="dashed", size=1) +
+     geom_hline(aes(yintercept=median(siteVisitsDF$visits)), 
+                      color="red", linetype="dashed", size=1) +   
+     ylab("Number of distinct site visits ") + scale_y_continuous(limits = c(0,9300))
+``` 
+  
+Let us plot a histogram to review this data.  
+```{r Solution - 11 Contd. - Univariate Analysis - visits - Histogram}
+   library(ggplot2)
+
+   ggplot(siteVisitsDF, aes(x= siteVisitsDF$visits)) + 
+     geom_histogram(color="darkblue", fill="lightblue", binwidth=50) +
+     geom_vline(aes(xintercept=mean(siteVisitsDF$visits)), color="orange", linetype="dashed", size=1) +
+     geom_vline(aes(xintercept=median(siteVisitsDF$visits)), color="red", linetype="dashed", size=1) +
+     scale_x_continuous(limits = c(0,9300)) + 
+     scale_y_continuous(limits = c(0,2000)) +
+     xlab("Number of distinct site visits")
+```
+
+As evident from the above histogram plot, the frequency of higher site visits decrease as we cross the mean line. So, plotting a subset of the above histogram to concentrate only till the mean line.    
+```{r Solution - 11 Contd. - Univariate Analysis - visits - Histogram2}
+   library(ggplot2)
+
+   ggplot(siteVisitsDF, aes(x= siteVisitsDF$visits)) + 
+     geom_histogram(color="darkblue", fill="lightblue", binwidth=50) +
+     geom_vline(aes(xintercept=mean(siteVisitsDF$visits)), color="orange", linetype="dashed", size=1) +
+     geom_vline(aes(xintercept=median(siteVisitsDF$visits)), color="red", linetype="dashed", size=1) +
+     scale_x_continuous(limits = c(0,2000)) + 
+     scale_y_continuous(limits = c(0,2000)) +
+     xlab("Number of distinct site visits")
+```
+Plotting a boxplot after ignoring the extreme outliers beyond 90% percentile
+
+```{r Solution - 11 Contd. - Univariate Analysis - visits - Box Plot}
+    library(ggplot2)
+    library(dplyr)
+    siteVisitsDF %>%
+      ggplot(aes()) + 
+      geom_boxplot(aes(y = visits)) +
+      scale_y_continuous(limits = c(0,3882)) + 
+      ylab("Visits") + xlab("")
+```
+Now let us plot a density plot to view the data evidenced in the Histogram against the Probability density, to confirm our understanding.  
+```{r Solution - 11 Contd. - Univariate Analysis - visits - Density Plot}
+    library(ggplot2)
+    ggplot(siteVisitsDF, aes(x=siteVisitsDF$visits)) + 
+      geom_density(color="darkgreen", fill="lightgreen") +
+      geom_vline(aes(xintercept=mean(siteVisitsDF$visits)), color="orange", linetype="dashed", size=1) +
+      geom_vline(aes(xintercept=median(siteVisitsDF$visits)), color="red", linetype="dashed", size=1) +
+      xlab("Number of distinct site visits")
+    
+    ggplot(siteVisitsDF, aes(x=siteVisitsDF$visits)) + 
+      geom_density(color="darkgreen", fill="lightgreen") +
+      geom_vline(aes(xintercept=mean(siteVisitsDF$visits)), color="orange", linetype="dashed", size=1) +
+      geom_vline(aes(xintercept=median(siteVisitsDF$visits)), color="red", linetype="dashed", size=1) +
+      scale_x_continuous(limits = c(0,2000)) +
+      xlab("Number of distinct site visits")
+```
+  + As evidenced in the density plots, the highest probability is closer to the lower numbers.
+  
+#### Final Inference of visits
+    1. The number of distinct visits to the website have a mean of 1934.708 visits and a median of 24 visits.  
+    2. The data is highly right skewed as evidenced by Median lying to the left of Mean and also by the Skewness being positive  
+    3. The data is Leptokurtic i.e. with more values in the distribution tails and more values close to the mean (i.e. sharply peaked with heavy tails)  
+    
+  **In general terms, even though there are lot of instances when the number of visits per day per platform and per user type (new or old) are quite high (above 3882), 75% of the times, the number of visits is within 334.** 
+    
+Considering the huge skewness of the data, performing a log transformation to reduce the skewness, helps us to visualize the data better.   
+
+```{r Solution 11 Contd. - Univariate Analysis - Logarithmic transformation of visits}
+    ggplot(siteVisitsDF, aes(x=log2(siteVisitsDF$visits))) + 
+           geom_histogram(color="darkblue", fill="lightblue") +
+           geom_vline(aes(xintercept=log2(mean(siteVisitsDF$visits))), 
+                      color="orange", linetype="dashed", size=1) +
+           geom_vline(aes(xintercept=log2(median(siteVisitsDF$visits))), 
+                      color="red", linetype="dashed", size=1) +
+           xlab("Log Transformation of Number of distinct site visits ")
+```  
+
+*****  
+ 
+2.**orders - This will give us an idea of how many orders have been made through the site**  
+
+```{r Solution - 11 Contd. - Univariate Analysis - orders}
+    library(moments)
+    library(dplyr)
+    library(tidyr)
+    library(pander)
+
+   siteVisitsDF %>% 
+     summarize(variable = "orders",
+               Min = min(siteVisitsDF$orders),
+               Max = max(siteVisitsDF$orders), 
+               Mean = mean(siteVisitsDF$orders),
+               Variance = var(siteVisitsDF$orders),
+               Std_Dev = sd(siteVisitsDF$orders),
+               Median = median(siteVisitsDF$orders),
+               Quartile_1 = quantile(siteVisitsDF$orders,probs = 0.25),
+               Quartile_2 = quantile(siteVisitsDF$orders,probs = 0.50),
+               Quartile_3 = quantile(siteVisitsDF$orders,probs = 0.75),
+               Quantile_90 = quantile(siteVisitsDF$orders,probs = 0.90),
+               Quantile_99 = quantile(siteVisitsDF$orders,probs = 0.99),
+               Skewness = skewness(siteVisitsDF$orders),
+               Kurtosis = kurtosis(siteVisitsDF$orders)) %>% pander()   
+```
+  + Now the table above shows that the number of orders span across a **range from 0 to 4,916**. 
+  + The **mean is around 62 orders** (62.38 to be exact) with a **standard deviation of 260.28**.
+  + The **median lies at 0 orders**
+  + The **first quartile (25%) and second quartile (50%) both are at 0 orders; with the third quartile (75%) being at 7.  
+  + On further look at the **90% and 95%** we see, that they **are at 92 and 356 respectively**. Thus, there are too many outliers, which has increased the mean.  
+
+Let us plot a scatter plot to review this data with the index or observtion number on x axis and the number of visits on the y axis.  
+```{r Solution - 11 Contd. - Univariate Analysis - orders- ScatterPlot}
+   library(ggplot2)   
+   ggplot(siteVisitsDF, aes(x= as.numeric(row.names(siteVisitsDF)) ,y= siteVisitsDF$orders)) +
+     geom_point(color = "darkblue", alpha = 0.25) + xlab("Observation Number") + 
+     geom_smooth(method="loess",colour = "darkgreen", orientation = "y", span = 0.3) +
+     stat_smooth(method="loess",colour="green",linetype=2, orientation = "y") + 
+     geom_hline(aes(yintercept=mean(siteVisitsDF$orders)), 
+                      color="orange", linetype="dashed", size=1) +
+     geom_hline(aes(yintercept=median(siteVisitsDF$orders)), 
+                      color="red", linetype="dashed", size=1) +        
+     ylab("Number of orders ")
+```
+
+ + The scatter plot shows there is a clear outlier on the top right, which obviously corresponds to the maximum number earlier found i.e. 4,916.  
+ + Also it shows that most of the data is concentrated at the bottom section along the x-axis.  
+ + Again, here too the number of orders peak up from observation number 17,500 and beyond, which correspond to the holiday session, as already evidenced earlier.
+
+Now, plotting the scatterplot again with eliminating the outliers of greater than the 95% data.  
+ 
+```{r Solution - 11 Contd. - Univariate Analysis - orders- ScatterPlot2}
+   library(ggplot2)   
+   ggplot(siteVisitsDF, aes(x= as.numeric(row.names(siteVisitsDF)) ,y= siteVisitsDF$orders)) +
+     geom_point(color = "darkblue", alpha = 0.25) +
+     geom_smooth(method="loess",colour = "darkgreen", orientation = "y", span = 0.3) +
+     stat_smooth(method="loess",colour="green",linetype=2, orientation = "y") + 
+     geom_hline(aes(yintercept=mean(siteVisitsDF$orders)), 
+                      color="orange", linetype="dashed", size=1) +
+     geom_hline(aes(yintercept=median(siteVisitsDF$orders)), 
+                      color="red", linetype="dashed", size=1) +       
+     xlab("Observation Number") + 
+     ylab("Number of orders ") + scale_y_continuous(limits = c(0,360))
+``` 
+
+Let us plot a histogram to review this data.  
+```{r Solution - 11 Contd. - Univariate Analysis - Orders - Histogram}
+   library(ggplot2)
+
+   ggplot(siteVisitsDF, aes(x= siteVisitsDF$orders)) + 
+     geom_histogram(color="darkblue", fill="lightblue", binwidth=50) +
+     geom_vline(aes(xintercept=mean(siteVisitsDF$orders)), color="orange", linetype="dashed", size=1) +
+     geom_vline(aes(xintercept=median(siteVisitsDF$orders)), color="red", linetype="dashed", size=1) +
+     scale_x_continuous(limits = c(0,5000)) + 
+     scale_y_continuous(limits = c(0,750)) +
+     xlab("Number of orders")
+```
+
+As evident from the above histogram plot, there are 2 peaks - one at 0 and the other aroud the 500 mark. So, limiting our view to 99 percentile of the data range.   
+```{r Solution - 11 Contd. - Univariate Analysis - Orders - Histogram2}
+   library(ggplot2)
+
+   ggplot(siteVisitsDF, aes(x= siteVisitsDF$orders)) + 
+     geom_histogram(color="darkblue", fill="lightblue", binwidth=50) +
+     geom_vline(aes(xintercept=mean(siteVisitsDF$orders)), color="orange", linetype="dashed", size=1) +
+     geom_vline(aes(xintercept=median(siteVisitsDF$orders)), color="red", linetype="dashed", size=1) +
+     scale_x_continuous(limits = c(0,1550)) + 
+     scale_y_continuous(limits = c(0,730)) +
+     xlab("Number of orders")
+```
+
+Plotting a box plot of the variable makes this more evident
+```{r Solution - 11 Contd. - Univariate Analysis - orders - box plot}
+    library(ggplot2)
+    library(dplyr)
+    siteVisitsDF %>%
+      ggplot(aes()) + 
+      geom_boxplot(aes(y = orders)) +
+      # scale_y_continuous(limits = c(0,1550)) + 
+      ylab("Gross Sales") + xlab("")
+```  
+
+Now let us plot a density plot to view the data evidenced in the Histogram against the Probability density, to confirm our understanding.  
+```{r Solution - 11 Contd. - Univariate Analysis - Orders - Density Plot}
+    library(ggplot2)
+    ggplot(siteVisitsDF, aes(x=siteVisitsDF$orders)) + 
+      geom_density(color="darkgreen", fill="lightgreen") +
+      geom_vline(aes(xintercept=mean(siteVisitsDF$orders)), color="blue", linetype="dashed", size=1) +
+      geom_vline(aes(xintercept=median(siteVisitsDF$orders)), color="red", linetype="dashed", size=1) +
+      xlab("Number of orders")
+    
+    ggplot(siteVisitsDF, aes(x=siteVisitsDF$orders)) + 
+      geom_density(color="darkgreen", fill="lightgreen") +
+      geom_vline(aes(xintercept=mean(siteVisitsDF$orders)), color="orange", linetype="dashed", size=1) +
+      geom_vline(aes(xintercept=median(siteVisitsDF$orders)), color="red", linetype="dashed", size=1) +
+      scale_x_continuous(limits = c(0,100)) +
+      xlab("Number of orders")
+```
+
+  + As evidenced in the density plots, the highest probability is closer to the lower numbers.
+  
+#### Final Inference of orders
+    1. The number of distinct visits to the website have a mean of 62 orders and a median of 0 orders.  
+    2. The data is highly right skewed as evidenced by Median lying to the left of Mean and also by the Skewness being positive  
+    3. The data is Leptokurtic i.e. with more values in the distribution tails and more values close to the mean (i.e. sharply peaked with heavy tails)  
+    
+  **In general terms, most of the times the users visit, they do not place any orders evident by 0 being the median.** 
+    
+Considering the huge skewness of the data, performing a log transformation to reduce the skewness, helps us to visualize the data better.  
+
+```{r Solution 11 Contd. - Univariate Analysis - Logarithmic transformation of orders}
+    ggplot(siteVisitsDF, aes(x=log2(siteVisitsDF$orders))) + 
+           geom_histogram(color="darkblue", fill="lightblue") +
+           geom_density(color="darkgreen")  + 
+           geom_vline(aes(xintercept=log2(mean(siteVisitsDF$orders))), 
+                      color="orange", linetype="dashed", size=1) +
+           geom_vline(aes(xintercept=log2(median(siteVisitsDF$orders))), 
+                      color="red", linetype="dashed", size=1) +
+           xlab("Log Transformation of Number of Orders ")
+```  
+
+*****  
+
+3. **gross_sales - This will give us an idea of the total sales made on the site**
+
+```{r Solution - 11 Contd. - Univariate Analysis - gross_sales}
+    library(moments)
+    library(dplyr)
+    library(tidyr)
+    library(pander)
+
+    summary(siteVisitsDF$gross_sales)
+    siteSales <- siteVisitsDF[!is.na(siteVisitsDF$gross_sales),]
+    siteSales %>% 
+      summarize(variable = "gross_sales",
+                Min = min(siteSales$gross_sales), 
+                Max = max(siteSales$gross_sales), 
+                Mean = mean(siteSales$gross_sales),
+                Variance = var(siteSales$gross_sales),
+                Std_Dev = sd(siteSales$gross_sales),
+                Median = median(siteSales$gross_sales),
+                Quartile_1 = quantile(siteSales$gross_sales,probs = 0.25),
+                Quartile_2 = quantile(siteSales$gross_sales,probs = 0.50),
+                Quartile_3 = quantile(siteSales$gross_sales,probs = 0.75),
+                Quantile_90 = quantile(siteSales$gross_sales,probs = 0.90),
+                Quantile_95 = quantile(siteSales$gross_sales,probs = 0.95),
+                Skewness = skewness(siteSales$gross_sales),
+                Kurtosis = kurtosis(siteSales$gross_sales)) %>% 
+      pander()
+    
+```
+  + Through the sumary function, we found that for **9576 occurrences there was no data**. Hence, removing them for the further analysis. **These instances signify an user visiting the site but not buying anything.**
+  + Now the table above shows that the gross_sales spans across a **huge range from 1 to 707,642**. 
+  + The **mean is around 16,473** with a **standard deviation of 51,111**.
+  + The **median lies at 851**
+  + The **first quartile (25%) is at 79; second quartile (50%) is at 851; with the third quartile (75%) being at 3145.  
+  + On further look at the **90% and 95%** we see, that they **are at 35,606.8 and 111,875 respectively**. 
+  **Thus, there are too many outliers, which has increased the mean.**  
+
+Let us plot a scatter plot to review this data with the index or observtion number on x axis and the number of visits on the y axis.  
+```{r Solution - 11 Contd. - Univariate Analysis - gross_sales- ScatterPlot}
+   library(ggplot2)   
+   ggplot(siteSales, aes(x= as.numeric(row.names(siteSales)) ,y= siteSales$gross_sales)) +
+     geom_point(color = "darkblue", alpha = 0.25) + 
+     geom_smooth(method="loess",colour = "darkgreen", orientation = "y", span = 0.3) +
+     stat_smooth(method="loess",colour="green",linetype=2, orientation = "y") + 
+     geom_hline(aes(yintercept=mean(siteSales$gross_sales)), 
+                      color="orange", linetype="dashed", size=1) +
+     geom_hline(aes(yintercept=median(siteSales$gross_sales)), 
+                      color="red", linetype="dashed", size=1) +     
+     xlab("Observation Number") + 
+     ylab("Gross Sales ")
+```  
+
+  + The scatter plot shows there is a clear outlier on the top right, which obviously corresponds to the maximum number earlier found i.e. 136,057.  
+  + This also shows the dense population of data at the extreme bottom section of the data
+  + The gross sale amount increases a Again, here too the number of orders peak up from observation number 7,500.
+  + Even using the local fitting method, the confidence interval lies very close to the Mean line.
+
+Now, plotting the scatterplot again with eliminating the outliers of greater than the 95% data.  
+ 
+```{r Solution - 11 Contd. - Univariate Analysis - gross_sales- ScatterPlot2}
+   library(ggplot2)   
+   ggplot(siteSales, aes(x= as.numeric(row.names(siteSales)) ,y= siteSales$gross_sales)) +
+     geom_point(color = "darkblue", alpha = 0.25) + 
+     geom_smooth(method="loess",colour = "darkgreen", orientation = "y", span = 0.3) +
+     stat_smooth(method="loess",colour="green",linetype=2, orientation = "y") + 
+     geom_hline(aes(yintercept=mean(siteSales$gross_sales)), 
+                      color="orange", linetype="dashed", size=1) +
+     geom_hline(aes(yintercept=median(siteSales$gross_sales)), 
+                      color="red", linetype="dashed", size=1) +     
+     xlab("Observation Number") + 
+     xlab("Observation Number") + 
+     ylab("Gross Sales ") + scale_y_continuous(limits = c(0,35700))
+```  
+
+Now, plotting the scatterplot again with eliminating the outliers of greater than the 90% data.   
+
+  + with the limited view we find the local minimum plot is very close to the median.  
+ 
+Let us plot a histogram to review this data.  
+```{r Solution - 11 Contd. - Univariate Analysis - gross_sales - Histogram}
+   library(ggplot2)
+
+   ggplot(siteSales, aes(x= siteSales$gross_sales)) + 
+     geom_histogram(color="darkblue", fill="lightblue", binwidth=350) +
+     geom_vline(aes(xintercept=mean(siteSales$gross_sales)), 
+                color="orange", linetype="dashed", size=1) +
+     geom_vline(aes(xintercept=median(siteSales$gross_sales)), 
+                color="red", linetype="dashed", size=1) +
+     scale_x_continuous(limits = c(0,35700)) + 
+     scale_y_continuous(limits = c(0,1300)) +
+     xlab("Gross Sales")
+```  
+As evident from the above histogram plot, the frequency of higher site visits decrease as we cross the mean line. So, plotting a subset of the above histogram to concentrate only till the mean line.    
+```{r Solution - 11 Contd. - Univariate Analysis - gross_sales - Histogram2}
+   library(ggplot2)
+
+   ggplot(siteSales, aes(x= siteSales$gross_sales)) + 
+     geom_histogram(color="darkblue", fill="lightblue", binwidth=400) +
+     geom_vline(aes(xintercept=mean(siteSales$gross_sales)), 
+                color="orange", linetype="dashed", size=1) +
+     geom_vline(aes(xintercept=median(siteSales$gross_sales)), 
+                color="red", linetype="dashed", size=1) +
+     scale_x_continuous(limits = c(0,25000)) + 
+     scale_y_continuous(limits = c(0,1500)) +
+     xlab("Gross Sales")
+```  
+```{r Solution - 11 Contd. - Univariate Analysis - gross_sales - Box Plot}
+    library(ggplot2)
+    library(dplyr)
+    siteSales %>%
+      ggplot(aes()) + 
+      geom_boxplot(aes(y = gross_sales)) +
+      scale_y_continuous(limits = c(0,25000)) + 
+      ylab("Gross Sales") + xlab("")
+```  
+
+ Now let us plot a density plot to view the data evidenced in the Histogram against the Probability density, to confirm our understanding.  
+```{r Solution - 11 Contd. - Univariate Analysis - gross_sales - Density Plot}
+    library(ggplot2)
+    ggplot(siteSales, aes(x=siteSales$gross_sales)) + 
+      geom_density(color="darkgreen", fill="lightgreen") +
+      geom_vline(aes(xintercept=mean(siteSales$gross_sales)), 
+                 color="orange", linetype="dashed", size=1) +
+      geom_vline(aes(xintercept=median(siteSales$gross_sales)), 
+                 color="red", linetype="dashed", size=1) +
+      xlab("Gross Sales")
+    
+    ggplot(siteSales, aes(x=siteSales$gross_sales)) + 
+      geom_density(color="darkgreen", fill="lightgreen") +
+      geom_vline(aes(xintercept=mean(siteSales$gross_sales)), 
+                 color="orange", linetype="dashed", size=1) +
+      geom_vline(aes(xintercept=median(siteSales$gross_sales)), 
+                 color="red", linetype="dashed", size=1) +
+      scale_x_continuous(limits = c(0,25000)) +
+      xlab("Gross Sales")
+```  
+
+  + As evidenced in the density plots, the highest probability is closer to the lower numbers.
+
+#### Final Inference of gross_sales
+    1. The gross sales on the website have a mean of 16,473.4 and a median of 841.  
+    2. The data is highly right skewed as evidenced by Median lying to the left of Mean and also by the Skewness being positive  
+    3. The data is Leptokurtic i.e. with more values in the distribution tails and more values close to the mean (i.e. sharply peaked with heavy tails)  
+    
+  **In general terms, as evidenced in the other univariate analyses; the gross sales peak during the holiday period. The higher gross sales reult in moving the Mean to the higher side and also results in higher variation. ** 
+    
+Considering the huge skewness of the data, performing a log transformation to reduce the skewness, helps us to visualize the data better.  
+
+```{r Solution 11 Contd. - Univariate Analysis - Logarithmic transformation of Gross Sales}
+    ggplot(siteSales, aes(x=log2(siteSales$gross_sales))) + 
+           geom_histogram(color="darkblue", fill="lightblue") +
+           geom_density(color="darkgreen")  + 
+           geom_vline(aes(xintercept=log2(mean(siteSales$gross_sales))), 
+                      color="orange", linetype="dashed", size=1) +
+           geom_vline(aes(xintercept=log2(median(siteSales$gross_sales))), 
+                      color="red", linetype="dashed", size=1) +
+           xlab("Log Transformation of Gross Sales ")
+```  
+
+*****  
+
+4. **site - One more univariate analysis we can do is on the basis of the categorical data, site, to understand which site has the most distinct visitors.**
+
+```{r Solution - 11 Contd. - Univariate Analysis - site}
+    library(dplyr)
+    library(tidyr)
+    library(pander)
+
+    siteVisitsDF %>%
+      group_by(site) %>%
+      summarize(total_visitors = sum(distinct_sessions), 
+                mean_visitors = mean(distinct_sessions)) %>%
+      mutate(total_visitor_pct = round(total_visitors/sum(total_visitors),3),
+             relative_visitor_freq = round(mean_visitors/sum(mean_visitors),3)) %>%
+      arrange(desc(total_visitor_pct)) %>%
+      pander()
+
+```
+  1. This clearly demonstrates that Acme is the most popular site with 87% visitors
+  2. Botly is the least popular site with just 0.4% visitors.
+
+Let us plot a bar plot to understand the data better.
+```{r Solution - 11 Contd. - Univariate Analysis - site - Bar Plot}
+    library(dplyr)
+    library(tidyr)
+    library(ggplot2)
+    library(forcats)
+
+    siteVisitsDF %>%
+      ggplot() + 
+      geom_bar(aes(fct_infreq(site)), color = "darkblue", fill = "lightblue") + coord_flip() +
+      labs(title = "Number of observations per site", y = "Site Name", x = "Frequency") 
+
+```
+```{r Solution - 11 Contd. - Univariate Analysis - site - Box Plot}
+    library(dplyr)
+    library(ggplot2)
+    library(forcats)
+
+    siteVisitsDF %>%
+      ggplot() + 
+      geom_boxplot(aes(fct_infreq(site), y = visits, color = site)) + 
+      scale_y_continuous(trans = "log2") +
+      labs(title = "Number of observations per site", x = "Site Name", y = "Log (Visits)") 
+
+```
+
+*****
+
+## Question 12
+
+12. Consider the same dataset as earlier. Now perform bi-.-variate data analysis as discussed in last
+class to find out relationships between different variables. Write a short description on what you find in
+the analyses along with any tables, graphs. You do not have to analyze all variables, any 3-.-4 that
+interest you most should be the focus here.
+
+### Solution
+```{r Solution - 12}
+
+#Remove all variables declared so far
+rm(list=ls())
+# Read the file into a dataframe and check the structure of the data
+library(openxlsx)
+
+visitsDF <- read.xlsx("./data/Prob_Assignment_Dataset.xlsx")
+# Load data into a dataframe table
+siteVisitsDF <- tbl_df(visitsDF)
+
+# Convert the data types of specific columns of dataframe
+siteVisitsDF$day <- convertToDateTime(siteVisitsDF$day)
+siteVisitsDF$site <- as.factor(siteVisitsDF$site)
+siteVisitsDF$new_customer <- as.factor(siteVisitsDF$new_customer)
+siteVisitsDF$platform <- as.factor(siteVisitsDF$platform)
+```
+
+For bivariate analysis, let us try to first plot a correlation table between all numeric columns. This will give us a good idea about which variables to consider for bivariate analysis.
+
+```{r Solution - 12 - Bivariate Analysis- Correlation}
+library(dplyr)
+
+siteVisitsDF %>%
+  select_if(is.numeric) %>%
+  drop_na() %>%
+  cor %>%
+  pander()
+```
+
+```{r Solution - 12 - Bivariate Analysis- Correlation Plot}
+library(dplyr)
+library(ggplot2)
+library(ggcorrplot)
+
+siteVisitsDF %>%
+  select_if(is.numeric) %>%
+  drop_na() %>%
+  cor %>%
+  ggcorrplot(type = "lower", show.diag = TRUE, show.legend = TRUE, hc.order = TRUE)
+```
+
+As a next step, let us try to plot the data for distinct_sessions against the product_page_views. This will give us an idea of how many pages an user visited during a session.
+
+```{r Solution - 12 - Bivariate Analysis- distinct_sessions vs product_page_views - Scatter Plot}
+library(dplyr)
+library(ggplot2)
+
+siteVisitsDF %>%
+  ggplot(aes(x=distinct_sessions, y = product_page_views)) + 
+  geom_point(color = "blue", alpha = .2) +
+  geom_smooth(size = 2, linetype = 2, method= "lm", color = "red") +
+  labs(title = " Product page views plotted against number of distinct users", 
+       x = "Distinct website visitors",
+       y = "Number of product pages viewed")
+
+```
+
+This confirms that there is a linear relation between the number of product pages viewed vs. the number of distict website visitors. The linear plot along with the correlation of 0.8987 as evidenced earlier by the correlation table, it confirms that there is a **positive linear relationship between the two variables, with one increaing positively leading to the increase of the other variable.**  
+
+1. **Day vs Visits - Let us try to analyze the relationship between day against visits.**  
+
+```{r Solution - 12 - Bivariate Analysis- day vs visits - Scatter Plot}
+library(dplyr)
+library(ggplot2)
+
+siteVisitsDF %>%
+  ggplot(aes(x=day, y= visits)) + 
+  geom_point(color = "blue", alpha = .2) +
+  labs(title = "Visits per day", 
+       x = "Date",
+       y = "Log transformation of Distinct website visits") +
+  scale_x_datetime(date_breaks = "1 month", date_minor_breaks = "1 week",
+             date_labels = "%b") 
+```   
+
+  Considering the huge skewness of the data, let us use the **Log2 transformation** to visualize this better.  
+```{r Solution - 12 - Bivariate Analysis- day vs visits - Scatter Plot - Log}
+library(dplyr)
+library(ggplot2)
+
+siteVisitsDF %>%
+  ggplot(aes(x=day, y= visits)) + 
+  geom_point(color = "blue", alpha = .2) +
+  labs(title = "Visits per day", 
+       x = "Date",
+       y = "Log transformation of Distinct website visits") +
+  scale_x_datetime(date_breaks = "1 month", date_minor_breaks = "1 week",
+             date_labels = "%b") +
+  #Considering the data skewness evident during the univariate analysis of visits, using the log transformation.
+  scale_y_continuous(trans = "log2")
+
+```  
+
+#### Inference
+  + This shows that the data is missing for Mar, Apr and May.  
+  + Also, it shows the number of visits started increasing from Sep-Oct timeframe till early Dec, peaking around mid November.  
+  
+*****  
+ 
+2. **Site vs Platform - Now, let us try to understand a site vs platform analysis to identify which combination results in maximum visits. **
+```{r Solution - 12 - Bivariate Analysis- Site vs Platform - Histogram Plot}
+library(dplyr)
+library(ggplot2)
+
+siteVisitsDF %>%
+  ggplot(aes(x = platform, y = visits)) + 
+  geom_histogram(aes(color = platform), stat = "sum") +
+  facet_wrap(~site, nrow = 2, ncol = 3) + 
+  coord_flip() +
+  scale_y_continuous(trans = "log2") + theme(legend.position = "none") +
+  labs (title = "Site vs Platform visitor count")
+
+```  
+
+Let us try to visualize this through a box plot to compare each site and platforms.  
+
+```{r Solution - 12 - Bivariate Analysis- Site vs Platform - Box Plot}
+library(dplyr)
+library(ggplot2)
+
+siteVisitsDF %>%
+  ggplot(aes(x = platform, y = visits)) + 
+  geom_boxplot(aes(color = platform)) +
+  facet_wrap(~site, nrow = 2, ncol = 3) + 
+  coord_flip() +
+  scale_y_continuous(trans = "log2") + 
+  labs (title = "Site vs Platform visitor box plot")
+
+```
+
+#### Inference 
+ + This shows that for the sites Botly, Tabular and Widgetry, not all platforms are being used.  
+ + Windows is the most used platform for bth Acme and Pinnacle, whereas, iOS is popular for Sortly, Tabular and Widgetry   
+ 
+*****  
+ 
+3. **Site vs Bounces - This will help us analyze the sites which are unattractive (highes bounces).**  
+
+```{r Solution - 12 - Bivariate Analysis- site vs bounces - Scatter Plot}
+library(dplyr)
+library(ggplot2)
+
+siteVisitsDF %>%
+  mutate(bounce_rate = bounces/visits) %>%
+  ggplot(aes(y=bounce_rate, x= site)) + 
+  geom_point(aes(color = site), alpha = .2) +
+  labs(title = "Bounces per site", 
+       x = "Site",
+       y = "Bounces") 
+```    
+
+Considering, that the scatter plot shows the data all over the place, let us try to visualize this through a box plot to compare each site and corresponding bounces.
+ 
+```{r Solution - 12 - Bivariate Analysis- Site vs Bounces - Box Plot}
+library(dplyr)
+library(ggplot2)
+
+siteVisitsDF %>%
+  mutate(bounce_rate = bounces/visits) %>%
+  ggplot(aes(y=bounce_rate, x= site)) + 
+  geom_boxplot(aes(color = site)) +
+  coord_flip() +
+  labs (title = "Site vs Bounce Rate box plot")
+```
+
+#### Inference 
+ + This shows that the sites Pinnacle and Sortly have the highes bounce rate. Thus, this proves these sites are the least attractive.
+ 
+*****  
+
+4. **Site vs Conversion Rate - This will help us analyze the sites which have the highest conversion ratio.**  
+
+```{r Solution - 12 - Bivariate Analysis- site vs Conversion - Scatter Plot}
+library(dplyr)
+library(ggplot2)
+
+siteVisitsDF %>%
+  mutate(conversion_rate = orders/visits) %>%
+  ggplot(aes(y=conversion_rate, x= site)) + 
+  geom_point(aes(color = site), alpha = .2) +
+  labs(title = "Conversion per site", 
+       x = "Site",
+       y = "Conversion Rate") 
+```    
+
+
+Considering, that the scatter plot shows the data all over the place, let us try to visualize this through a box plot to compare each site and corresponding conversions.
+ 
+```{r Solution - 12 - Bivariate Analysis- Site vs Conversion Rate - Box Plot}
+library(dplyr)
+library(ggplot2)
+
+siteVisitsDF %>%
+  mutate(conversion_rate = orders/visits) %>%
+  ggplot(aes(y=conversion_rate, x= site)) + 
+  geom_boxplot(aes(color = site)) +
+  coord_flip() +
+  labs (title = "Site vs Conversion Rate box plot", 
+       y = "Site",
+       x = "Conversion Rate") 
+```  
+
+#### Inference 
+ + This shows that the median conversion rate in the sites Widgetry, Tabular and Botly are close to 1. So, once an user enters in one of these sites, the chances of placing an order is pretty high. 
+ 
+*****  
+
+5. **Platform vs Add to Cart Rate - This will help us analyze which platforms have the highest add to cart rate.**  
+```{r Solution - 12 - Bivariate Analysis- Platform vs Add to cart rate - Scatter Plot}
+library(dplyr)
+library(ggplot2)
+
+siteVisitsDF %>%
+  mutate(add_to_cart_rate = add_to_cart/visits) %>%
+  ggplot(aes(y=add_to_cart_rate, x= platform)) + 
+  geom_point(aes(color = platform), alpha = .2) +
+  labs(title = "Add to Cart rate per platorm", 
+       x = "Site",
+       y = "Conversion Rate") + 
+  theme(legend.direction = "vertical", axis.text.x = element_text(angle = 90))
+```    
+
+Considering, that the scatter plot shows the data all over the place, let us try to visualize this through a box plot to compare each site and corresponding conversions.
+ 
+```{r Solution - 12 - Bivariate Analysis- Site vs Add to Cart Rate - Box Plot}
+library(dplyr)
+library(ggplot2)
+
+siteVisitsDF %>%
+  mutate(add_to_cart_rate = add_to_cart/visits) %>%
+  ggplot(aes(y=add_to_cart_rate, x= platform)) + 
+  geom_boxplot(aes(color = platform)) +
+  coord_flip() +
+  labs(title = "Add to Cart rate per platorm", 
+       x = "Platform",
+       y = "Add to Cart rate") + 
+  theme(legend.direction = "vertical", axis.text.x = element_text(angle = 90))
+```  
+
+
+#### Inference 
+ + This shows that the highest median add to cart rate is on iOS. So, this gives us an impression that the iOS application is really effective.  
+ 
+*****  
+
+**Finally, let us do a Multivariate analysis between Site, Platform vs Conversion Rate - This will really help us draw the conclusion of which site, platform combination gives the best Conversion.**  
+
+```{r Solution - 12 - Multivariate Analysis- Platform vs site vs Conversion - Scatter Plot}
+library(dplyr)
+library(ggplot2)
+
+siteVisitsDF %>%
+  mutate(conversion_rate = orders/visits) %>%
+  ggplot(aes(y=conversion_rate, x= site)) +
+  geom_point(aes(color = site), alpha = .2) +
+  facet_wrap(~ platform, nrow = 3, ncol = 5) + 
+  labs(title = "Conversion per site", 
+       x = "Site",
+       y = "Conversion Rate") +
+    theme(axis.text.x = element_blank())
+```   
+
+To understand this better, let us plot the box and whisker plots.
+```{r Solution - 12 - Multivariate Analysis- Platform vs site vs Conversion - Box Plot}
+library(dplyr)
+library(ggplot2)
+
+siteVisitsDF %>%
+  mutate(conversion_rate = orders/visits) %>%
+  ggplot(aes(y=conversion_rate, x= site)) +
+  geom_boxplot(aes(color = site), alpha = .2) +
+  facet_wrap(~ platform, nrow = 3, ncol = 5) + 
+  labs(title = "Conversion per site", 
+       x = "Site",
+       y = "Conversion Rate") +
+    theme(axis.text.x = element_blank())
+``` 
+
+
+#### Inference 
+ + This helps us infer the following:
+      - For "Acme" the highest median conversion rate is on iOS and Windows
+      - For "Botly", the highest median conversion rate is on Android. Going by the dat, it seems they do not either have any application on any other platform or the data is missing.
+      - For "Pinnacle", the highest median conversion rate is for iPad
+      - "Sortly" has the highest median conversion rate in Other platforms
+      - iOS and iPad both seem to have 100% median conversion rate for "Tabular"
+      - Finally, "Widgetry" has again 100% median conversion rate on iOS and iPhone
+  + The above list helps us understand, which applications/ sites to be upgraded
+  
+ 
+*****  
+
